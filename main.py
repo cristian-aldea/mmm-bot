@@ -16,10 +16,10 @@ def get_server_status(channel):
     server = MinecraftServer.lookup("mmm-server.com")
     try:
         status = server.status()
-        message_text = ':white_check_mark: The server is online! {}/{} player are playing!'.format(
+        message_text = ':white_check_mark: The server is online! {}/{} players are playing!'.format(
             status.players.online, status.players.max)
     except:
-        message_text = ':warning: The server currently isn\'t responding.'
+        message_text = ':warning: The server currently isn\'t responding. Yell at the admin until it\'s back up. :eyes:'
 
     return message_text
 
