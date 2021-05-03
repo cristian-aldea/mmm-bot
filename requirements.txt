@@ -1,2 +1,3 @@
 mcstatus
 discord.py
+python-dotenv
