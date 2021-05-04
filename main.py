@@ -1,12 +1,14 @@
 import argparse
+import asyncio
 import os
 import threading
 import time
 
 import discord
 from dotenv import load_dotenv
+from mcstatus import MinecraftServer
 
-from utils import get_server_status, is_user_admin, log, now_time
+from utils import UPDATE_TIMESTAMP_FORMAT, is_admin, log, now_time
 
 load_dotenv()
 client = discord.Client()
@@ -24,45 +26,79 @@ server_url = args.server_url
 ping_interval = args.ping_interval
 
 
-loop_thread: threading.Thread = None
+loop_task: asyncio.Task = None
 loop_stop_flag = False
 
-loop_thread
+server_down = False
+admin_user = None
+
+
+async def stop_task():
+    global loop_task, loop_stop_flag
+    if loop_task and not loop_task.done() and not loop_stop_flag:
+        log("Existing task found. Sending stop signal and waiting for task to stop")
+        loop_stop_flag = True
+        await loop_task
 
 
 async def parse_command(message):
-    if message.content == "$status":
+    global loop_task
+    command = message.content.split()
+    log("Received command {}".format(command))
 
-        global loop_thread, loop_stop_flag
+    if command[0] == '/mmm' and command[1] == 'status':
+        await stop_task()
 
-        if loop_thread and loop_thread.is_alive() and not loop_stop_flag:
-            log("Existing alive thread found. Sending stop signal and waiting for thread to stop")
-            loop_stop_flag = True
-            loop_thread.join()
+        log("Creating task for status coroutine")
+        loop_task = asyncio.create_task(
+            server_status_update_loop(message.channel))
+    elif command[0] == '/mmm' and command[1] == 'stop':
+        await stop_task()
 
-        log("Creating thread for status subroutine")
-        loop_thread = threading.Thread(
-            target=await server_status_update_loop(message.channel))
-        loop_thread.start()
+
+async def get_server_status(channel, server_url) -> str:
+    global server_down, admin_user
+    server = MinecraftServer.lookup(server_url)
+    try:
+        status = server.status()
+        message_text = ':white_check_mark:  `{}` is online!\n\n{}/{} player are playing!\n\nLast updated on {}'\
+            .format(server_url,
+                    status.players.online,
+                    status.players.max,
+                    now_time(UPDATE_TIMESTAMP_FORMAT))
+
+        if server_down:
+            server_down = False
+    except:
+        message_text = ':warning:  `{}` isn\'t responding. The admin has been notified and should solve the issue soon :)\n\nLast updated on {}'\
+            .format(server_url, now_time(UPDATE_TIMESTAMP_FORMAT))
+
+        if not server_down:
+            log("Server unavailable. Sending DM to user {}".format(admin_user))
+
+            await admin_user.send(content="The server is down D:")
+            server_down = True
+
+    return message_text
 
 
 async def server_status_update_loop(status_channel):
-    global loop_stop_flag, loop_thread
-
-    log("Deleting messages on channel {}".format(status_channel.name))
+    global loop_stop_flag
+    log("server_status_update_loop - Deleting messages on channel {}".format(status_channel.name))
     deleted = await status_channel.purge()
-    log('Deleted {} message(s) on the channel'.format(len(deleted)))
+    log('server_status_update_loop - Deleted {} message(s) on the channel'.format(len(deleted)))
 
-    log('Creating server status message')
-    status_message = await status_channel.send(content=get_server_status(status_channel, server_url))
+    log('server_status_update_loop - Creating server status message')
+    status_message = await status_channel.send(content=await get_server_status(status_channel, server_url))
 
-    log('Running loop to edit message every {} seconds to update the status message'.format(
+    log('server_status_update_loop - Running loop to edit message every {} seconds to update the status message'.format(
         ping_interval))
     while True:
         time.sleep(ping_interval)
-        log("Editing message with current server status")
-        await status_message.edit(content=get_server_status(status_channel, server_url))
+        log("server_status_update_loop - Editing message with current server status")
+        await status_message.edit(content=await get_server_status(status_channel, server_url))
         if loop_stop_flag:
+            log("server_status_update_loop - Loop stop flag caught. Stopping loop")
             loop_stop_flag = False
             break
 
@@ -74,10 +110,12 @@ async def on_ready():
 
 @client.event
 async def on_message(message):
+    global admin_user
     if message.author == client.user:
         return
 
-    if is_user_admin(message.author):
+    if is_admin(message.author):
+        admin_user = message.author
         await parse_command(message)
 
 
