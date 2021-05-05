@@ -2,8 +2,8 @@ from datetime import datetime
 
 import discord
 
-LOG_TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S'
-UPDATE_TIMESTAMP_FORMAT = '%b %d %Y, %H:%M:%S UTC'
+LOG_TIMESTAMP_FORMAT = "%Y-%m-%d %H:%M:%S"
+UPDATE_TIMESTAMP_FORMAT = "%b %d %Y, %H:%M:%S UTC"
 
 
 def now_time(dt_format) -> str:
@@ -12,7 +12,7 @@ def now_time(dt_format) -> str:
 
 
 def is_admin(user) -> bool:
-    admin_role = discord.utils.get(user.roles, name='Admin')
+    admin_role = discord.utils.get(user.roles, name="Admin")
     return not admin_role == None
 
 
