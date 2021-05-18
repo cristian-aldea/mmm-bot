@@ -15,10 +15,13 @@ parser = argparse.ArgumentParser(
     description="Discord bot which gives live updates on the status of your server!")
 parser.add_argument("--server-url", default="mmm-server.com",
                     help="The Minecraft Server URL to ping")
+parser.add_argument("--ping-host", default="mmm-server.com",
+                    help="The Minecraft Server Host to ping")
 parser.add_argument("--ping-interval", type=int, default=5,
                     help="How often the bot should ping the server")
 
 args = parser.parse_args()
+ping_host = args.ping_host
 server_url = args.server_url
 ping_interval = args.ping_interval
 
@@ -57,9 +60,10 @@ async def parse_command(message):
         await stop_task()
 
 
-async def get_server_status(channel, server_url) -> str:
-    global server_down, admin_user
-    server = MinecraftServer.lookup(server_url)
+async def get_server_status(channel) -> str:
+    global server_down, admin_user, server_url, ping_host
+
+    server = MinecraftServer.lookup(ping_host)
     try:
         status = server.status()
         message_text = ":white_check_mark:  `{}` is online!\n\n{}/{} player are playing!\n\nLast updated on {}"\
@@ -90,14 +94,20 @@ async def status_update_loop(status_channel):
     log("status_update_loop - Deleted {} message(s) on the channel".format(len(deleted)))
 
     log("status_update_loop - Creating server status message")
-    status_message = await status_channel.send(content=await get_server_status(status_channel, server_url))
+    status_message = await status_channel.send(content=await get_server_status(status_channel))
 
     log("status_update_loop - Editing message every {} seconds with current status".format(ping_interval))
 
     while True:
         time.sleep(ping_interval)
-        await status_message.edit(content=await get_server_status(status_channel, server_url))
+
+        log("status_update_loop - Getting server status")
+        status = await get_server_status(status_channel)
+
+        log("status_update_loop - Editing Message")
+        await status_message.edit(content=status)
         log("status_update_loop - Message edited successfully")
+
         if loop_stop_flag:
             log("status_update_loop - Loop stop flag caught. Exiting loop")
             loop_stop_flag = False

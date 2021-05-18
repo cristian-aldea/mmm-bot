@@ -7,7 +7,7 @@ UPDATE_TIMESTAMP_FORMAT = "%b %d %Y, %H:%M:%S UTC"
 
 
 def now_time(dt_format) -> str:
-    now = datetime.now()
+    now = datetime.utcnow()
     return now.strftime(dt_format)
 
 
