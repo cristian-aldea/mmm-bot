@@ -52,7 +52,7 @@ async def parse_command(message: Message):
             await message.channel.send(content="I'm not currently sending updates to this server")
 
 
-@tasks.loop(minutes=1)
+@tasks.loop(minutes=20)
 async def update_status():
     global master_list
     log("update_status - Processing master_list entries")
